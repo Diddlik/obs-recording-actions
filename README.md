@@ -1,7 +1,7 @@
 # Recording Actions for OBS Studio
 
-[![Windows build](https://github.com/Diddlik/obs-recording-actions/actions/workflows/build.yml/badge.svg)](https://github.com/Diddlik/obs-recording-actions/actions/workflows/build.yml)
-[![Latest release](https://img.shields.io/github/v/release/Diddlik/obs-recording-actions)](https://github.com/Diddlik/obs-recording-actions/releases/latest)
+[![Windows build](https://github.com/Diddlik/obs-recording-actions/actions/workflows/build.yml/badge.svg?branch=main&event=push)](https://github.com/Diddlik/obs-recording-actions/actions/workflows/build.yml)
+[![Latest release](https://img.shields.io/github/v/release/Diddlik/obs-recording-actions?label=release&cacheSeconds=300)](https://github.com/Diddlik/obs-recording-actions/releases/latest)
 
 A native Windows x64 OBS plugin with three hotkeys:
 
