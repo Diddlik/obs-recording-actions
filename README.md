@@ -30,7 +30,9 @@ ctest --preset release
 cpack --config build_x64/CPackConfig.cmake -C Release -B dist
 ```
 
-The first configure builds the OBS development libraries in Debug and Release. Qt and OBS runtime libraries are supplied by OBS when the plugin is installed; do not copy the SDK DLLs into your OBS installation.
+Package builds require Inno Setup 6; use `-InnoCompiler <path-to-ISCC.exe>` if it is not in its standard install folder.
+
+The first configure builds the OBS development libraries in Debug and Release. Qt and OBS runtime libraries are supplied by OBS. Packaging includes only the matching Qt Schannel TLS backend under plugin data; do not copy unrelated SDK DLLs into OBS.
 
 Alternatively, build, test, and package in one step:
 
@@ -77,7 +79,9 @@ Download the Windows ZIP from [GitHub Releases](https://github.com/Diddlik/obs-r
 
 4. Start OBS and open **Tools → Recording Actions**.
 
-For portable OBS, copy the DLL to `<OBS>\obs-plugins\64bit` and the contents of the packaged `data` folder to `<OBS>\data\obs-plugins\obs-recording-actions`. Install only one copy. Updates are manual: close OBS, replace the plugin files, and restart. Uninstall by removing only these plugin files while OBS is closed.
+The recommended installation is the release `*-windows-x64-setup.exe`: close OBS, run setup, and select the OBS installation folder containing `bin/64bit/obs64.exe`. Setup installs both the DLL and locale resources and provides an uninstaller. It updates a previous DLL installed in that OBS folder. If a ProgramData copy exists, remove that plugin copy first to avoid duplicate loading. The ZIP remains available for manual installation. English and German locales are packaged and embedded as a fallback for incomplete DLL-only installations.
+
+For portable OBS, copy the DLL to `<OBS>\obs-plugins\64bit` and the contents of the packaged `data` folder to `<OBS>\data\obs-plugins\obs-recording-actions`. Install only one copy. For manual ZIP updates, close OBS, replace the plugin files, and restart. Uninstall by removing only these plugin files while OBS is closed.
 
 ## Configure and use
 
@@ -125,9 +129,9 @@ Use disposable recordings and two empty test destinations:
 
 ## License and release status
 
-GPL-2.0-or-later; see `LICENSE` and `data/THIRD_PARTY_NOTICES.md`. The About dialog lists OBS, Qt, and template credits. No third-party runtime DLLs are redistributed in the plugin ZIP.
+GPL-2.0-or-later; see `LICENSE` and `data/THIRD_PARTY_NOTICES.md`. The About dialog lists OBS, Qt, and template credits. The package includes the matching Qt Schannel TLS backend for HTTPS; its licenses and corresponding-source links are in `data/THIRD_PARTY_NOTICES.md`.
 
-Published by [Diddlik](https://github.com/Diddlik) at [obs-recording-actions](https://github.com/Diddlik/obs-recording-actions). OPEN: a trusted update feed and automatic update service. Version 1 uses manual installation. Keep the corresponding source with any binary distribution.
+Published by [Diddlik](https://github.com/Diddlik) at [obs-recording-actions](https://github.com/Diddlik/obs-recording-actions). Version 1.1 includes automatic HTTPS update checks using GitHub Releases, a manual check in About, and an optional SHA-256-verified installer download. Checks run once per OBS startup and can be disabled in plugin settings. Installation remains user-controlled: close OBS and run the downloaded installer. The installer refuses installation or uninstallation while OBS runs and preserves OBS settings. Keep the corresponding source with any binary distribution.
 
 The build script's `-Package` switch also writes `dist/obs-recording-actions-1.0.0-source.zip` containing the buildable project source, tests, documentation, and pinned build helpers.
 
@@ -136,3 +140,5 @@ Local verification on 2026-10-06: Release and Debug builds with MSVC v143 on the
 GitHub Actions builds and tests Debug and Release on Windows for pushes to `main` and pull requests. Tags matching the version in `buildspec.json`, such as `v1.0.0`, publish the tested packages with SHA-256 checksums. Release notes are stored in `docs/release-notes/`.
 
 To retry an interrupted publication, run the workflow manually from `main` with `release_tag` set to the existing version tag. It builds that tagged source and uploads only the ZIP packages and checksum file; CPack's staging directories are excluded.
+
+Update verification on the local sandbox: packaged English/German locales load with the installed OBS runtime; the packaged Schannel backend loads. A live HTTPS request reports `No credentials` in this sandbox (also reproduced by system curl). CI separately verifies live HTTPS with the packaged backend. An interactive install/uninstall and OBS update download still require manual validation.

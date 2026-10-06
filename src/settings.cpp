@@ -28,6 +28,8 @@ PluginSettings readSettings(obs_data_t *data)
 		settings.targets[i].directory =
 			std::filesystem::u8path(obs_data_get_string(data, (key + "Directory").c_str()));
 	}
+	obs_data_set_default_bool(data, "autoUpdates", true);
+	settings.autoUpdates = obs_data_get_bool(data, "autoUpdates");
 	settings.enableLogs = obs_data_get_bool(data, "enableLogs");
 	settings.geometry = obs_data_get_string(data, "geometry");
 	return settings;
@@ -41,6 +43,7 @@ bool writeConfiguration(obs_data_t *data, const PluginSettings &settings)
 		obs_data_set_string(data, (key + "Directory").c_str(),
 				    settings.targets[i].directory.u8string().c_str());
 	}
+	obs_data_set_bool(data, "autoUpdates", settings.autoUpdates);
 	obs_data_set_bool(data, "enableLogs", settings.enableLogs);
 	obs_data_set_string(data, "geometry", settings.geometry.c_str());
 	const auto path = configurationPath();

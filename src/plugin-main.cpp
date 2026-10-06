@@ -1,6 +1,9 @@
 #include "recording-actions.hpp"
 #include <obs-module.h>
 #include <memory>
+#include <QCoreApplication>
+#include <util/bmem.h>
+#include <windows.h>
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("obs-recording-actions", "en-US")
@@ -22,6 +25,11 @@ std::unique_ptr<RecordingActions> manager;
 }
 bool obs_module_load(void)
 {
+	// Keep this mutex until process termination so an installer cannot replace a loaded DLL.
+	CreateMutexW(nullptr, FALSE, L"Global\\ObsRecordingActions");
+	std::unique_ptr<char, decltype(&bfree)> tlsPath(obs_module_file("qt"), bfree);
+	if (tlsPath)
+		QCoreApplication::addLibraryPath(QString::fromUtf8(tlsPath.get()));
 	try {
 		manager = std::make_unique<RecordingActions>();
 		manager->initialize();

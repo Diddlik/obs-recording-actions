@@ -13,6 +13,7 @@ struct MoveTarget {
 struct PluginSettings {
 	std::array<MoveTarget, 2> targets;
 	bool enableLogs = false;
+	bool autoUpdates = true;
 	std::string geometry;
 };
 std::filesystem::path configurationPath();

@@ -1,4 +1,10 @@
 #include "recording-actions.hpp"
+#include "updates.hpp"
+#include <QCryptographicHash>
+#include <QSslSocket>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QEventLoop>
 #include <obs-module.h>
 #include <util/base.h>
 #include <util/bmem.h>
@@ -7,6 +13,7 @@
 #include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QLineEdit>
+#include <QLabel>
 #include <QPushButton>
 #include <QThread>
 #include <QWidget>
@@ -134,6 +141,25 @@ int main(int argc, char **argv)
 		std::cerr << message.toStdString() << '\n';
 	});
 	QApplication application(argc, argv);
+	if (application.arguments().contains("--https-smoke")) {
+		if (!QSslSocket::supportsSsl()) {
+			std::cerr << "TLS backend unavailable\n";
+			return 1;
+		}
+		QNetworkAccessManager network;
+		QNetworkRequest request(QUrl("https://api.github.com/repos/Diddlik/obs-recording-actions"));
+		request.setHeader(QNetworkRequest::UserAgentHeader, "Recording-Actions-runtime-smoke");
+		request.setTransferTimeout(15000);
+		auto *reply = network.get(request);
+		QEventLoop loop;
+		QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+		loop.exec();
+		std::cout << "TLS backend: " << QSslSocket::activeBackend().toStdString()
+			  << "; HTTPS status: " << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+			  << "; " << reply->errorString().toStdString() << '\n';
+		return reply->error() == QNetworkReply::NoError ? 0 : 1;
+	}
+
 	QWidget window;
 	window.setAttribute(Qt::WA_DontShowOnScreen);
 	mainWindow = &window;
@@ -148,12 +174,22 @@ int main(int argc, char **argv)
 	bool started = obs_startup("en-US", root.u8string().c_str(), nullptr);
 	try {
 		require(started, "libobs startup");
+		require(QSslSocket::supportsSsl(), "HTTPS TLS backend available");
+		auto digest = QCryptographicHash::hash("installer fixture", QCryptographicHash::Sha256).toHex();
+		auto manifest = digest + "  setup.exe\n";
+		require(installerChecksum(manifest, "setup.exe") == digest, "Exact installer checksum selected");
+		require(installerChecksum(manifest, "other.exe").isEmpty(), "Missing installer checksum rejected");
+		require(installerChecksum(manifest + manifest, "setup.exe").isEmpty(), "Duplicate checksum rejected");
+		require(installerChecksum(QByteArray(64, 'z') + "  setup.exe", "setup.exe").isEmpty(),
+			"Malformed hash rejected");
+		require(installerChecksum("abc  setup.exe", "setup.exe").isEmpty(), "Truncated hash rejected");
 		obs_hotkey_enable_callback_rerouting(true);
 		require(config_open(&profile, (root / "profile.ini").u8string().c_str(), CONFIG_OPEN_ALWAYS) ==
 				CONFIG_SUCCESS,
 			"Profile fixture");
 		auto config = loadConfiguration();
 		PluginSettings initial;
+		initial.autoUpdates = false;
 		initial.targets[0] = {"Client A", root / "target1"};
 		initial.targets[1] = {"", root / "target2"};
 		require(writeConfiguration(config.get(), initial), "Initial settings saved");
@@ -217,6 +253,18 @@ int main(int argc, char **argv)
 			pump();
 			auto dialogs = window.findChildren<QDialog *>();
 			require(dialogs.size() == 1 && dialogs[0]->isVisible(), "Tools opens modeless settings");
+			require(toolsAction->text() == "Recording Actions",
+				"Embedded locale repairs missing installed resources");
+			for (auto *label : dialogs[0]->findChildren<QLabel *>())
+				require(!label->text().startsWith("Settings."), "Settings labels are translated");
+			auto *aboutButtons = dialogs[0]->findChild<QDialogButtonBox *>();
+			aboutButtons->button(QDialogButtonBox::Help)->click();
+			pump();
+			auto *about = dialogs[0]->findChild<QDialog *>();
+			require(about && about->findChild<QLabel *>()->text().contains("GPL-2.0-or-later"),
+				"About contains licenses with missing locale files");
+			about->close();
+			pump();
 			auto edits = dialogs[0]->findChildren<QLineEdit *>();
 			require(edits.size() == 4, "Two target rows");
 			edits[0]->setText(QString::fromUtf8("Kunde Ü / 日本語"));

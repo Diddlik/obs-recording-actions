@@ -1,5 +1,7 @@
 #include "recording-actions.hpp"
 #include "version.hpp"
+#include "updates.hpp"
+#include <QSettings>
 #include <obs-module.h>
 #include <util/bmem.h>
 #include <util/config-file.h>
@@ -18,7 +20,14 @@
 namespace {
 QString text(const char *key)
 {
-	return QString::fromUtf8(obs_module_text(key));
+	const auto translated = QString::fromUtf8(obs_module_text(key));
+	if (translated != QString::fromUtf8(key))
+		return translated;
+	// Keep the UI usable even when a manual DLL-only installation omits locale files.
+	QSettings fallback(QString(":/recording-actions/locale/%1.ini")
+				   .arg(QString::fromUtf8(obs_get_locale()).startsWith("de") ? "de-DE" : "en-US"),
+			   QSettings::IniFormat);
+	return fallback.value(QString::fromUtf8(key), translated).toString();
 }
 constexpr std::array<const char *, 3> keys = {"recording-actions.move1", "recording-actions.move2",
 					      "recording-actions.delete"};
@@ -52,8 +61,13 @@ void RecordingActions::initialize()
 	}
 	updateDescriptions();
 	obs_frontend_add_event_callback(eventCallback, this);
+	if (settings.autoUpdates)
+		QTimer::singleShot(15000, this, [this] {
+			if (!exiting && settings.autoUpdates)
+				checkForUpdates(this, static_cast<QWidget *>(obs_frontend_get_main_window()), true);
+		});
 	signal_handler_connect(obs_get_signal_handler(), "hotkey_bindings_changed", bindingsChanged, this);
-	menu = static_cast<QAction *>(obs_frontend_add_tools_menu_qaction(obs_module_text("Plugin.Name")));
+	menu = static_cast<QAction *>(obs_frontend_add_tools_menu_qaction(text("Plugin.Name").toUtf8().constData()));
 	connect(menu, &QAction::triggered, this, &RecordingActions::showSettings);
 }
 
@@ -62,6 +76,7 @@ void RecordingActions::shutdown()
 	if (exiting.exchange(true))
 		return;
 	timer.stop();
+	delete findChild<QObject *>("recording-actions-update");
 	cancellation.cancel();
 	if (workerThread.joinable()) {
 		CancelSynchronousIo(workerThread.native_handle());
@@ -226,7 +241,8 @@ void RecordingActions::updateDescriptions()
 		auto description = text("Hotkey.Move").arg(alias(i)).toUtf8();
 		obs_hotkey_set_description(hotkeys[i].id, description.constData());
 	}
-	obs_hotkey_set_description(hotkeys[2].id, obs_module_text("Hotkey.Delete"));
+	auto deleting = text("Hotkey.Delete").toUtf8();
+	obs_hotkey_set_description(hotkeys[2].id, deleting.constData());
 }
 
 void RecordingActions::showSettings()
@@ -270,6 +286,9 @@ void RecordingActions::showSettings()
 	auto *logging = new QCheckBox(text("Settings.EnableLogs"), window);
 	logging->setChecked(settings.enableLogs);
 	layout->addWidget(logging);
+	auto *updates = new QCheckBox(text("Settings.AutoUpdates"), window);
+	updates->setChecked(settings.autoUpdates);
+	layout->addWidget(updates);
 	auto *hint = new QLabel(text("Settings.Hint"), window);
 	hint->setWordWrap(true);
 	layout->addWidget(hint);
@@ -282,7 +301,7 @@ void RecordingActions::showSettings()
 	buttons->button(QDialogButtonBox::Help)->setText(text("Settings.About"));
 	layout->addWidget(buttons);
 	connect(buttons, &QDialogButtonBox::rejected, window, &QDialog::reject);
-	connect(buttons, &QDialogButtonBox::helpRequested, window, [window] {
+	connect(buttons, &QDialogButtonBox::helpRequested, window, [this, window] {
 		auto *about = new QDialog(window);
 		about->setAttribute(Qt::WA_DeleteOnClose);
 		about->setWindowTitle(text("Settings.About"));
@@ -291,6 +310,12 @@ void RecordingActions::showSettings()
 		label->setWordWrap(true);
 		label->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::LinksAccessibleByKeyboard);
 		box->addWidget(label);
+		auto *project = new QLabel(text("About.Project"), about);
+		project->setOpenExternalLinks(true);
+		box->addWidget(project);
+		auto *check = new QPushButton(text("Updates.Check"), about);
+		box->addWidget(check);
+		connect(check, &QPushButton::clicked, about, [this, about] { checkForUpdates(this, about, false); });
 		auto *close = new QDialogButtonBox(QDialogButtonBox::Close, about);
 		box->addWidget(close);
 		connect(close, &QDialogButtonBox::rejected, about, &QDialog::close);
@@ -312,6 +337,7 @@ void RecordingActions::showSettings()
 			next.targets[i].directory = path;
 		}
 		next.enableLogs = logging->isChecked();
+		next.autoUpdates = updates->isChecked();
 		next.geometry = window->saveGeometry().toBase64().toStdString();
 		if (!writeConfiguration(data.get(), next)) {
 			error->setText(text("Settings.SaveFailed"));

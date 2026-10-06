@@ -49,12 +49,21 @@ jobs:
         run: ./scripts/build.ps1 -Configuration Debug
       - name: Build, test and package Release
         run: ./scripts/build.ps1 -Package
+      - name: Verify HTTPS with packaged TLS backend
+        run: |
+          $qt = (Get-ChildItem .deps -Directory -Filter 'obs-deps-qt6-*-x64' | Select-Object -First 1).FullName
+          $deps = (Get-ChildItem .deps -Directory -Filter 'obs-deps-*-x64' | Where-Object Name -NotLike '*qt6*' | Select-Object -First 1).FullName
+          $env:PATH = "$pwd/.deps/bin;$qt/bin;$deps/bin;$env:PATH"
+          $env:QT_PLUGIN_PATH = "$pwd/build_x64/installer-stage/obs-recording-actions/data/qt;$qt/plugins"
+          & ./build_x64/Release/recording-actions-integration.exe --https-smoke
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged HTTPS runtime verification failed.' }
       - name: Upload packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows-x64
           path: |
             dist/*.zip
+            dist/*-setup.exe
             dist/SHA256SUMS.txt
           if-no-files-found: error
       - name: Upload test logs
@@ -85,9 +94,9 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" dist/*.zip dist/SHA256SUMS.txt --clobber
+            gh release upload "$RELEASE_TAG" dist/*.zip dist/*-setup.exe dist/SHA256SUMS.txt --clobber
           else
-            gh release create "$RELEASE_TAG" dist/*.zip dist/SHA256SUMS.txt --verify-tag \
+            gh release create "$RELEASE_TAG" dist/*.zip dist/*-setup.exe dist/SHA256SUMS.txt --verify-tag \
               --title "Recording Actions $RELEASE_TAG" \
               --notes-file "docs/release-notes/$RELEASE_TAG.md"
           fi
