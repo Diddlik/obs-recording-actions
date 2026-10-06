@@ -53,7 +53,7 @@ jobs:
         run: |
           $qt = (Get-ChildItem .deps -Directory -Filter 'obs-deps-qt6-*-x64' | Select-Object -First 1).FullName
           $deps = (Get-ChildItem .deps -Directory -Filter 'obs-deps-*-x64' | Where-Object Name -NotLike '*qt6*' | Select-Object -First 1).FullName
-          $env:PATH = "$pwd/.deps/bin;$qt/bin;$deps/bin;$env:PATH"
+          $env:PATH = "$pwd/.deps/bin/64bit;$qt/bin;$deps/bin;$env:PATH"
           $env:QT_PLUGIN_PATH = "$pwd/build_x64/installer-stage/obs-recording-actions/data/qt;$qt/plugins"
           & ./build_x64/Release/recording-actions-integration.exe --https-smoke
           if ($LASTEXITCODE -ne 0) { throw 'Packaged HTTPS runtime verification failed.' }
