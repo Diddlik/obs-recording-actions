@@ -134,3 +134,5 @@ The build script's `-Package` switch also writes `dist/obs-recording-actions-1.0
 Local verification on 2026-10-06: Release and Debug builds with MSVC v143 on the Visual Studio 2026 host; core and frontend-simulation test suites pass. Real cross-volume moves were exercised between `F:` and `C:`. The Release DLL also loads against the installed OBS 32.2.2 runtime libraries. Full interactive OBS recording and display-scaling checks remain manual.
 
 GitHub Actions builds and tests Debug and Release on Windows for pushes to `main` and pull requests. Tags matching the version in `buildspec.json`, such as `v1.0.0`, publish the tested packages with SHA-256 checksums. Release notes are stored in `docs/release-notes/`.
+
+To retry an interrupted publication, run the workflow manually from `main` with `release_tag` set to the existing version tag. It builds that tagged source and uploads only the ZIP packages and checksum file; CPack's staging directories are excluded.
