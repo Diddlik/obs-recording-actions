@@ -1,0 +1,2 @@
+#pragma once
+#define RECORDING_ACTIONS_VERSION "@PROJECT_VERSION@"

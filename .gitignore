@@ -1,0 +1,8 @@
+.deps/
+build*/
+dist/
+graft/
+.claude/
+CMakeUserPresets.json
+*.user
+/cmake/.CMakeBuildNumber
